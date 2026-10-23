@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>frib1trecon — escaneando {{ job.domain }}</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="{{ url_for('index') }}">
+        <img class="brand-mark" src="{{ url_for('static', filename='favicon.svg') }}" alt="">
+        <span class="brand-name">frib1t<span>recon</span></span>
+      </a>
+      <nav class="topnav">
+        <a href="{{ url_for('index') }}">&larr; Inicio</a>
+        <a href="{{ url_for('help_page') }}">❓ Ayuda</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="hero">
+      <span class="eyebrow">🛰 Escaneo en curso</span>
+      <h1>{{ job.domain }}</h1>
+    </div>
+
+    <div class="card">
+      <div class="progress-meta">
+        <span class="status-pill running" id="status-pill">
+          <span class="status-dot"></span>
+          <span id="status-text">En curso</span>
+        </span>
+        <span class="progress-count"><strong id="count">0</strong> resultado(s) procesados hasta ahora</span>
+      </div>
+      <div class="terminal" id="log"></div>
+      <p class="hint" style="margin-top:0.8rem">Esta página se actualiza sola — no hace falta que la recargues. Es deliberadamente lento (pausas aleatorias) para no levantar bloqueos en los buscadores.</p>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    frib1trecon — reconocimiento OSINT pasivo
+  </footer>
+
+  <script>
+    let cursor = 0;
+    const jobId = {{ job.id | tojson }};
+
+    function lineClass(evt) {
+      if (evt.type === "finding_summary") return evt.leak ? "lt-leak" : "lt-ok";
+      if (evt.type === "aborted" || evt.type === "error") return "lt-error";
+      if (evt.type === "warning") return "lt-warning";
+      if (evt.type === "done") return "lt-done";
+      if (evt.type === "processing" || evt.type === "dork_results") return "lt-dim";
+      return "";
+    }
+
+    function formatEvent(evt) {
+      if (evt.type === "dork_start") return `[${evt.index}/${evt.total}] ${evt.name}: ${evt.query}`;
+      if (evt.type === "dork_results") return `    -> ${evt.count} resultado(s)`;
+      if (evt.type === "processing") return `        descargando/analizando: ${evt.url}`;
+      if (evt.type === "finding_summary") return evt.leak
+        ? `        [!] posible leak: ${evt.url}`
+        : `        ok: ${evt.url}`;
+      if (evt.type === "external_start") return `>> consultando: ${evt.source}`;
+      if (evt.type === "aborted") return `*** ABORTADO: ${evt.reason} ***`;
+      if (evt.type === "warning") return `*** AVISO: ${evt.message} ***`;
+      if (evt.type === "done") return "--- escaneo finalizado, generando informes ---";
+      return JSON.stringify(evt);
+    }
+
+    async function poll() {
+      let data;
+      try {
+        const res = await fetch(`/api/job/${jobId}?since=${cursor}`);
+        data = await res.json();
+      } catch (e) {
+        setTimeout(poll, 2000);
+        return;
+      }
+
+      cursor = data.cursor;
+      const log = document.getElementById("log");
+      for (const evt of data.events) {
+        const line = document.createElement("span");
+        line.className = "log-line " + lineClass(evt);
+        line.textContent = formatEvent(evt);
+        log.appendChild(line);
+        log.appendChild(document.createTextNode("\n"));
+      }
+      log.scrollTop = log.scrollHeight;
+      document.getElementById("count").textContent = data.n_findings;
+
+      const pill = document.getElementById("status-pill");
+      if (data.status === "done") {
+        pill.className = "status-pill done";
+        document.getElementById("status-text").textContent = "Completado, cargando resultados...";
+        location.reload();
+        return;
+      }
+      if (data.status === "error") {
+        pill.className = "status-pill error";
+        document.getElementById("status-text").textContent = "ERROR: " + data.error;
+        return;
+      }
+      setTimeout(poll, 1500);
+    }
+
+    poll();
+  </script>
+</body>
+</html>

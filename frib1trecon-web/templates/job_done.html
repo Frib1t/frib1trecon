@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>frib1trecon — resultados {{ job.domain }}</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="{{ url_for('index') }}">
+        <img class="brand-mark" src="{{ url_for('static', filename='favicon.svg') }}" alt="">
+        <span class="brand-name">frib1t<span>recon</span></span>
+      </a>
+      <nav class="topnav">
+        <a href="{{ url_for('index') }}">&larr; Nuevo análisis</a>
+        <a href="{{ url_for('help_page') }}">❓ Ayuda</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="hero">
+      <span class="eyebrow">✅ Escaneo completado</span>
+      <h1>{{ job.domain }}</h1>
+      <p class="hint">Iniciado: {{ job.started_at }}</p>
+    </div>
+
+    <a class="graph-cta" href="{{ url_for('job_graph', job_id=job.id) }}">
+      🕸️ Ver grafo de red interactivo
+    </a>
+
+    {% if multi_host %}
+    <p class="hint">
+      <strong>{{ job.hosts | length }} hosts escaneados:</strong> {{ job.hosts | join(', ') }}
+      (recursividad activada — el informe de abajo ya incluye el dominio principal
+      + todos los subdominios juntos; cada subdominio además tiene su propio informe
+      aparte en <code>subdominios/&lt;subdominio&gt;/</code> dentro de la carpeta del job).
+    </p>
+    {% endif %}
+    <div class="downloads-group">
+      <div class="downloads">
+        <a href="{{ url_for('download', job_id=job.id, fmt='txt') }}">⬇ informe.txt</a>
+        <a href="{{ url_for('download', job_id=job.id, fmt='xlsx') }}">⬇ informe.xlsx</a>
+        <a href="{{ url_for('download', job_id=job.id, fmt='docx') }}">⬇ informe.docx</a>
+        {% if reports.informe_pdf %}
+        <a href="{{ url_for('download', job_id=job.id, fmt='informe-pdf') }}">⬇ informe.pdf (LaTeX)</a>
+        {% endif %}
+        {% if reports.informe_tex %}
+        <a href="{{ url_for('download', job_id=job.id, fmt='informe-tex') }}">⬇ informe.tex</a>
+        {% endif %}
+        {% if reports.informe_md %}
+        <a href="{{ url_for('download', job_id=job.id, fmt='informe-md') }}">⬇ informe.md</a>
+        {% endif %}
+        <a href="{{ url_for('download', job_id=job.id, fmt='json') }}">⬇ resultados.json</a>
+        <a href="{{ url_for('download', job_id=job.id, fmt='csv') }}">⬇ resultados.csv</a>
+        <a href="{{ url_for('download', job_id=job.id, fmt='maltego') }}">⬇ maltego.csv</a>
+        <a href="{{ url_for('download', job_id=job.id, fmt='red-png') }}">⬇ red.png</a>
+        <a href="{{ url_for('download', job_id=job.id, fmt='red-dot') }}">⬇ red.dot</a>
+        <a href="{{ url_for('download', job_id=job.id, fmt='red-json') }}">⬇ red.json</a>
+        <a href="{{ url_for('download', job_id=job.id, fmt='cyber-health') }}">⬇ cyber_health_check.docx (entrega)</a>
+        {% if reports.cyber_health_pdf %}
+        <a href="{{ url_for('download', job_id=job.id, fmt='cyber-health-pdf') }}">⬇ cyber_health_check.pdf (LaTeX, entrega)</a>
+        {% endif %}
+        {% if reports.cyber_health_tex %}
+        <a href="{{ url_for('download', job_id=job.id, fmt='cyber-health-tex') }}">⬇ cyber_health_check.tex</a>
+        {% endif %}
+        {% if reports.cyber_health_md %}
+        <a href="{{ url_for('download', job_id=job.id, fmt='cyber-health-md') }}">⬇ cyber_health_check.md</a>
+        {% endif %}
+      </div>
+      {% if reports.cyber_health_tex and not reports.cyber_health_pdf %}
+      <p class="hint">⚠ No se encontró <code>pdflatex</code> en el servidor al generar este informe: solo está disponible el <code>.tex</code> (compílalo donde quieras) y el <code>.md</code>, no el <code>.pdf</code>.</p>
+      {% endif %}
+    </div>
+
+    <div class="risk-banner risk-{{ summary.risk.level }}">
+      <div class="risk-head">
+        <div class="risk-score">⚠ NIVEL DE RIESGO: {{ summary.risk.level_label | upper }} ({{ "%.2f"|format(summary.risk.score) | replace(".00", "") }}%)</div>
+        <div class="risk-bar-track">
+          <div class="risk-bar-fill" style="width: {{ summary.risk.score }}%"></div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <tr><th>Categoría de riesgo</th><th>Peso</th><th>Estado</th></tr>
+          {% for item in summary.risk.breakdown %}
+          <tr class="{{ 'risk-review' if item.triggered else 'risk-ok' }}">
+            <td>{{ item.label }}</td>
+            <td>{{ "%.2f"|format(item.weight) | replace(".00", "") }}</td>
+            <td>{{ "A REVISAR" if item.triggered else "OK" }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+    </div>
+
+    <section>
+      <h2>📊 Resumen</h2>
+      <div class="table-wrap">
+        <table>
+          <tr><th>Usuarios/autores</th><td>{{ summary.authors | join(', ') or '-' }}</td></tr>
+          <tr><th>Editores (last modified by)</th><td>{{ summary.editors | join(', ') or '-' }}</td></tr>
+          <tr><th>Software/aplicaciones</th><td>{{ summary.software | join(', ') or '-' }}</td></tr>
+          <tr><th>Emails detectados</th><td>{{ summary.emails | join(', ') or '-' }}</td></tr>
+          <tr><th>Rutas internas detectadas</th><td>{{ summary.paths | join(', ') or '-' }}</td></tr>
+          <tr><th>Equipos/servidores detectados</th><td>{{ summary.computers | join(', ') or '-' }}</td></tr>
+          <tr><th>Comprobaciones DNS/WHOIS realizadas</th><td>{{ summary.n_dns }}</td></tr>
+          <tr><th>Transferencia de zona (AXFR) vulnerable</th><td>{{ "SI — critico" if summary.axfr_vulnerable else ("No" if summary.n_dns else "-") }}</td></tr>
+          <tr><th>Comprobaciones TLS/cabeceras realizadas</th><td>{{ summary.n_tls }}</td></tr>
+          <tr><th>Comprobaciones typosquat/domain squat realizadas</th><td>{{ summary.n_typosquat }}</td></tr>
+        <tr><th>Puertos abiertos / servicios detectados</th><td>{{ summary.n_ports }}</td></tr>
+          <tr><th>Personas encontradas en LinkedIn</th><td>{{ summary.n_people }}</td></tr>
+          <tr><th>Hallazgos en fuentes externas</th><td>{{ summary.n_external }}</td></tr>
+          <tr><th>Proveedores cloud detectados</th><td>{{ summary.cloud | join(', ') or '-' }}</td></tr>
+          <tr><th>Tecnologías web detectadas</th><td>{{ summary.tech | join(', ') or '-' }}</td></tr>
+          <tr><th>Software con CVEs/exploits conocidos</th><td>{{ summary.n_vulns }}</td></tr>
+          <tr><th>Ficheros con posibles leaks/credenciales</th><td>{{ summary.n_leaks }}</td></tr>
+        </table>
+      </div>
+    </section>
+
+    {% set dns_checks = findings | selectattr('category', 'equalto', 'dns') | list %}
+    {% if dns_checks %}
+    <section>
+      <h2>🧬 DNS y WHOIS ({{ dns_checks | length }})</h2>
+      <div class="table-wrap">
+        <table>
+          <tr>{% if multi_host %}<th>Host</th>{% endif %}<th>Comprobación</th><th>Resultado</th><th>Detalle</th></tr>
+          {% for f in dns_checks %}
+          <tr>
+            {% if multi_host %}<td>{{ f.host }}</td>{% endif %}
+            <td>{{ f.dork_name }}</td>
+            <td>{{ f.title or '-' }}</td>
+            <td style="white-space: pre-wrap">{{ f.note or '-' }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+    </section>
+    {% endif %}
+
+    {% set tls_checks = findings | selectattr('category', 'equalto', 'tls') | list %}
+    {% if tls_checks %}
+    <section>
+      <h2>🔒 TLS y cabeceras de seguridad ({{ tls_checks | length }})</h2>
+      <div class="table-wrap">
+        <table>
+          <tr>{% if multi_host %}<th>Host</th>{% endif %}<th>Comprobación</th><th>Resultado</th><th>Detalle</th></tr>
+          {% for f in tls_checks %}
+          <tr>
+            {% if multi_host %}<td>{{ f.host }}</td>{% endif %}
+            <td>{{ f.dork_name }}</td>
+            <td>{{ f.title or '-' }}</td>
+            <td style="white-space: pre-wrap">{{ f.note or '-' }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+    </section>
+    {% endif %}
+
+    {% set typosquat_checks = findings | selectattr('category', 'equalto', 'typosquat') | list %}
+    {% if typosquat_checks %}
+    <section>
+      <h2>🎭 Typosquatting y domain squatting ({{ typosquat_checks | length }})</h2>
+      <div class="table-wrap">
+        <table>
+          <tr>{% if multi_host %}<th>Host</th>{% endif %}<th>Comprobación</th><th>Resultado</th><th>Variantes registradas</th></tr>
+          {% for f in typosquat_checks %}
+          <tr>
+            {% if multi_host %}<td>{{ f.host }}</td>{% endif %}
+            <td>{{ f.dork_name }}</td>
+            <td>{{ f.title or '-' }}</td>
+            <td style="white-space: pre-wrap">{{ f.note or '-' }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+    </section>
+    {% endif %}
+
+    {% set ports_checks = findings | selectattr('category', 'equalto', 'ports') | list %}
+    {% if ports_checks %}
+    <section>
+      <h2>🔌 Puertos y servicios — nmap, escaneo activo ({{ ports_checks | length }})</h2>
+      <div class="table-wrap">
+        <table>
+          <tr>{% if multi_host %}<th>Host</th>{% endif %}<th>Comprobación</th><th>Resultado</th><th>Detalle</th></tr>
+          {% for f in ports_checks %}
+          <tr>
+            {% if multi_host %}<td>{{ f.host }}</td>{% endif %}
+            <td>{{ f.dork_name }}</td>
+            <td>{{ f.title or '-' }}</td>
+            <td style="white-space: pre-wrap">{{ f.note or '-' }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+    </section>
+    {% endif %}
+
+    {% set docs = findings | selectattr('category', 'equalto', 'document') | list %}
+    {% if docs %}
+    <section>
+      <h2>📄 Documentos con metadatos ({{ docs | length }})</h2>
+      <div class="table-wrap">
+        <table>
+          <tr>{% if multi_host %}<th>Host</th>{% endif %}<th>Tipo</th><th>Autor</th><th>Ult. modif. por</th><th>Software</th><th>Creado</th><th>Modificado</th><th>Emails</th><th>Rutas internas</th><th>Equipos/Servidores</th><th>GPS</th><th>URL</th></tr>
+          {% for f in docs %}
+          <tr class="{{ 'leak' if f.gps else '' }}">
+            {% if multi_host %}<td>{{ f.host }}</td>{% endif %}
+            <td>{{ f.filetype or '-' }}</td>
+            <td>{{ f.author or '-' }}</td>
+            <td>{{ f.last_modified_by or '-' }}</td>
+            <td>{{ f.software or '-' }}</td>
+            <td>{{ f.created or '-' }}</td>
+            <td>{{ f.modified or '-' }}</td>
+            <td>{{ f.emails | join(', ') or '-' }}</td>
+            <td>{{ f.internal_paths | join(', ') or '-' }}</td>
+            <td>{{ f.computers | join(', ') or '-' }}</td>
+            <td>{% if f.gps %}<a href="https://www.google.com/maps?q={{ f.gps }}" target="_blank" rel="noopener">{{ f.gps }}</a>{% else %}-{% endif %}</td>
+            <td><a href="{{ f.url }}" target="_blank" rel="noopener">{{ f.url }}</a></td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+    </section>
+    {% endif %}
+
+    {% set sens = findings | selectattr('category', 'equalto', 'sensitive') | list %}
+    {% if sens %}
+    <section>
+      <h2>🗂 Ficheros sensibles — sql/log/env/bak ({{ sens | length }})</h2>
+      <div class="table-wrap">
+        <table>
+          <tr>{% if multi_host %}<th>Host</th>{% endif %}<th>Tipo</th><th>Patrones detectados</th><th>URL</th></tr>
+          {% for f in sens %}
+          <tr class="{{ 'leak' if f.secrets else '' }}">
+            {% if multi_host %}<td>{{ f.host }}</td>{% endif %}
+            <td>{{ f.filetype or '-' }}</td>
+            <td>{{ f.secrets | join(', ') or '-' }}</td>
+            <td><a href="{{ f.url }}" target="_blank" rel="noopener">{{ f.url }}</a></td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+    </section>
+    {% endif %}
+
+    {% set plat = findings | selectattr('category', 'in', ['platform', 'leak']) | list %}
+    {% if plat %}
+    <section>
+      <h2>🚩 Plataformas externas / posibles leaks OSINT ({{ plat | length }})</h2>
+      <div class="table-wrap">
+        <table>
+          <tr>{% if multi_host %}<th>Host</th>{% endif %}<th>Categoría</th><th>Dork</th><th>Detalle</th><th>URL</th></tr>
+          {% for f in plat %}
+          <tr class="{{ 'leak' if f.category == 'leak' else '' }}">
+            {% if multi_host %}<td>{{ f.host }}</td>{% endif %}
+            <td><span class="badge {{ 'leak' if f.category == 'leak' else '' }}">{{ f.category }}</span></td>
+            <td>{{ f.dork_name }}</td>
+            <td>{{ f.detalle }}</td>
+            <td><a href="{{ f.url }}" target="_blank" rel="noopener">{{ f.url }}</a></td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+    </section>
+    {% endif %}
+
+    {% set email_osint = findings | selectattr('category', 'equalto', 'email') | list %}
+    {% if email_osint %}
+    <section>
+      <h2>✉️ Emails recopilados de fuentes públicas ({{ email_osint | length }})</h2>
+      <div class="table-wrap">
+        <table>
+          <tr><th>Emails</th><th>Encontrado en</th><th>URL</th></tr>
+          {% for f in email_osint %}
+          <tr>
+            <td>{{ f.emails | join(', ') }}</td>
+            <td>{{ f.dork_name }}</td>
+            <td><a href="{{ f.url }}" target="_blank" rel="noopener">{{ f.url }}</a></td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+    </section>
+    {% endif %}
+
+    {% if people %}
+    <section>
+      <h2>🏢 Organigrama aproximado — LinkedIn ({{ people | length }})</h2>
+      <p class="hint">
+        Agrupado por nivel de seniority detectado en el puesto (palabras clave).
+        <strong>No son relaciones de jefatura reales</strong>: LinkedIn no las expone
+        en búsqueda pública, esto es solo una aproximación.
+      </p>
+      <div class="table-wrap">
+        <table>
+          <tr><th>Nivel</th><th>Nombre</th><th>Puesto</th><th>Empresa</th><th>LinkedIn</th></tr>
+          {% for f in people %}
+          <tr class="{{ 'dim' if f.confianza == 'Sin confirmar' else '' }}">
+            <td>{{ f.nivel_label }}</td>
+            <td>{{ f.person_name }}</td>
+            <td>{{ f.role }}</td>
+            <td>{{ f.confianza }}</td>
+            <td><a href="{{ f.url }}" target="_blank" rel="noopener">{{ f.url }}</a></td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+    </section>
+    {% endif %}
+
+    {% set external = findings | selectattr('category', 'in', ['shodan', 'bucket', 'intelx', 'subdomains', 'wayback', 'cloud', 'reputation']) | list %}
+    {% if external %}
+    <section>
+      <h2>🌐 Fuentes externas y Cloud — Shodan / VirusTotal / AbuseIPDB / GrayHatWarfare / IntelX / crt.sh / Wayback / AWS-Azure-GCP... ({{ external | length }})</h2>
+      <div class="table-wrap">
+        <table>
+          <tr>{% if multi_host %}<th>Host</th>{% endif %}<th>Categoría</th><th>Fuente</th><th>Info</th><th>Detalle</th><th>URL</th></tr>
+          {% for f in external %}
+          <tr class="{{ 'leak' if f.category == 'bucket' else '' }}">
+            {% if multi_host %}<td>{{ f.host }}</td>{% endif %}
+            <td><span class="badge">{{ f.category }}</span></td>
+            <td>{{ f.dork_name }}</td>
+            <td>{{ f.title or '-' }}</td>
+            <td>{{ f.note or '-' }}</td>
+            <td>{% if f.url %}<a href="{{ f.url }}" target="_blank" rel="noopener">{{ f.url }}</a>{% else %}-{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+    </section>
+    {% endif %}
+
+    {% set tech = findings | selectattr('category', 'equalto', 'tech') | list %}
+    {% if tech %}
+    <section>
+      <h2>🧰 Tecnologías detectadas ({{ tech | length }})</h2>
+      <div class="table-wrap">
+        <table>
+          <tr>{% if multi_host %}<th>Host</th>{% endif %}<th>Tecnología</th><th>Versión</th><th>URL</th></tr>
+          {% for f in tech %}
+          <tr>
+            {% if multi_host %}<td>{{ f.host }}</td>{% endif %}
+            <td>{{ f.dork_name.replace('Tecnologia detectada: ', '') }}</td>
+            <td>{{ f.title or '-' }}</td>
+            <td><a href="{{ f.url }}" target="_blank" rel="noopener">{{ f.url }}</a></td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+    </section>
+    {% endif %}
+
+    {% set vulns = findings | selectattr('category', 'equalto', 'vuln') | list %}
+    {% if vulns %}
+    <section>
+      <h2>🛡 Vulnerabilidades conocidas — NVD / ExploitDB / Sploitus ({{ vulns | length }})</h2>
+      <div class="table-wrap">
+        <table>
+          <tr>{% if multi_host %}<th>Host</th>{% endif %}<th>Software</th><th>Resultados</th><th>Detalle</th></tr>
+          {% for f in vulns %}
+          <tr class="leak">
+            {% if multi_host %}<td>{{ f.host }}</td>{% endif %}
+            <td>{{ f.dork_name.replace('Vulnerabilidades conocidas: ', '') }}</td>
+            <td>{{ f.title or '-' }}</td>
+            <td style="white-space: pre-wrap">{{ f.note or '-' }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+    </section>
+    {% endif %}
+
+    <p><a href="{{ url_for('index') }}" class="btn">&larr; Nuevo análisis</a></p>
+  </main>
+
+  <footer class="site-footer">
+    frib1trecon — reconocimiento OSINT pasivo
+  </footer>
+</body>
+</html>

@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>frib1trecon — ayuda</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="{{ url_for('index') }}">
+        <img class="brand-mark" src="{{ url_for('static', filename='favicon.svg') }}" alt="">
+        <span class="brand-name">frib1t<span>recon</span></span>
+      </a>
+      <nav class="topnav">
+        <a href="{{ url_for('index') }}">&larr; Volver al analizador</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="hero">
+      <span class="eyebrow">❓ Ayuda</span>
+      <h1>Cómo funciona frib1trecon</h1>
+    </div>
+
+    <div class="card">
+      <section style="margin-bottom:0">
+        <h2>🔎 Qué hace</h2>
+        <p>
+          Dado un dominio, lanza decenas de búsquedas ("dorks") a través de una instancia
+          propia de <strong>SearXNG</strong> (nunca scrapea Google directamente,
+          por eso no se arriesga a que te bloqueen la IP), además de comprobaciones
+          directas de DNS/TLS/reputación, para encontrar:
+        </p>
+        <ul>
+          <li>Documentos ofimáticos públicos (pdf, xlsx, xls, docx, doc, csv, pptx) — se descargan y se les extraen metadatos (autor, último editor, software, empresa, responsable, fechas, rutas internas filtradas y equipos/servidores internos filtrados en rutas UNC).</li>
+          <li>Ficheros sensibles (sql, log, env, bak), tanto indexados en buscadores como rutas habituales que se comprueban directamente (.env, .git/config, copias de base de datos, phpinfo, paneles) — se comprueba si contienen contraseñas, api keys, claves AWS, claves privadas, etc.</li>
+          <li>Menciones del dominio en Google Drive, Docs, S3, Dropbox, Pastebin, Trello, OneDrive, Notion.</li>
+          <li>Posibles leaks en GitHub, GitLab, Ghostbin, JSFiddle, StackOverflow, directorios abiertos ("index of") y paneles de administración expuestos — verificados en local (patrón de credencial real o URL de panel), no solo por lo que diga el buscador.</li>
+          <li>Emails corporativos mencionados en cualquier página indexada (no solo documentos): contacto, directorios, foros, noticias...</li>
+          <li>Postura DNS/WHOIS (SPF/DKIM/DMARC/DNSSEC/AXFR) y TLS/cabeceras de seguridad — activas siempre, gratis, sin api keys.</li>
+          <li>Empleados en LinkedIn, tecnologías web + CVEs/EOL, typosquatting/domain squatting, fuentes externas (Shodan, buckets cloud, reputación, etc.) y puertos abiertos + versión de cada servicio vía nmap — todas activas por defecto para el informe más completo; se pueden destildar una por una en el formulario.</li>
+        </ul>
+        <p>Al final se calcula un <strong>nivel de riesgo general (0-100%)</strong> resumiendo todo lo anterior.</p>
+      </section>
+    </div>
+
+    <div class="card">
+      <section style="margin-bottom:0">
+        <h2>▶️ Cómo usarlo</h2>
+        <ol>
+          <li>Asegúrate de que SearXNG esté arriba (desde <code>frib1trecon/</code>: <code>./install.sh</code> o <code>python3 setup_searxng.py</code>).</li>
+          <li>En la página principal, escribe el dominio objetivo (ej. <code>site.com</code>, sin <code>http://</code> ni <code>www.</code>).</li>
+          <li>Por defecto corren todas las categorías; destildá las que no quieras (ej. nmap si el dominio no es tuyo o no tenés autorización para tráfico activo) y pulsa <strong>Analizar dominio</strong>.</li>
+          <li>Verás el progreso en vivo: cada dork, cada fichero mientras se descarga/analiza, y avisos en rojo si aparece un posible leak. Es normal que tarde varios minutos — es deliberadamente lento para no levantar bloqueos en los buscadores.</li>
+          <li>Al terminar, se muestra el nivel de riesgo, las tablas de resultados y los enlaces de descarga (<code>informe.txt</code>, <code>informe.docx</code>, <code>informe.xlsx</code>, <code>resultados.json</code>, <code>resultados.csv</code>...).</li>
+        </ol>
+      </section>
+    </div>
+
+    <div class="card">
+      <section style="margin-bottom:0">
+        <h2>🧩 Opciones del formulario</h2>
+        <div class="table-wrap">
+          <table>
+            <tr><th>Campo</th><th>Qué hace</th></tr>
+            <tr><td>Guardar documentos descargados</td><td>Si está marcado, los ficheros encontrados se quedan en <code>scans/&lt;dominio&gt;/&lt;id&gt;/documentos/</code>. Si lo desmarcas, se descartan justo después de extraer sus metadatos (no ocupan disco).</td></tr>
+            <tr><td>Solo listar URLs</td><td>Modo rápido y discreto: solo dice qué URLs encontró, sin bajar ningún fichero ni extraer metadatos ni emails de página completa.</td></tr>
+            <tr><td>Empleados en LinkedIn</td><td>Organigrama aproximado por seniority. Más lenta y menos fiable (LinkedIn indexa poco en los buscadores).</td></tr>
+            <tr><td>Tecnologías web y CVEs</td><td>Fingerprinting + CVEs conocidos (NVD/ExploitDB/Sploitus) + software sin soporte (EOL vía endoflife.date).</td></tr>
+            <tr><td>Puertos abiertos y versiones de servicios</td><td>Escaneo nmap -sT -sV DIRECTO contra el objetivo (top 100 puertos) + CVEs/EOL de cada servicio identificado. Activo por defecto: destildalo si el dominio no es tuyo o no tenés autorización para tráfico activo.</td></tr>
+            <tr><td>Typosquatting / domain squatting</td><td>Genera y resuelve 1000+ variantes del dominio. La más lenta de todas las opciones.</td></tr>
+            <tr><td>Fuentes externas y cloud</td><td>Shodan/crt.sh/Certspotter/Wayback (gratis) + buckets públicos S3/GCS/Azure (activo, sin key) + GrayHatWarfare/IntelX/DNSDumpster/VirusTotal/AbuseIPDB con tu api key.</td></tr>
+            <tr><td>Seguir subdominios descubiertos</td><td>Requiere "Fuentes externas". Escanea también cada subdominio (1 nivel) y los junta con el dominio principal en un único informe consolidado.</td></tr>
+            <tr><td>Delay mínimo / máximo</td><td>Pausa aleatoria (en segundos) entre cada búsqueda, para no saturar los motores detrás de SearXNG. Nunca baja de 1.5s aunque pongas menos.</td></tr>
+            <tr><td>Instancia SearXNG</td><td>URL de tu SearXNG local. Por defecto <code>http://127.0.0.1:8080</code>, el que levanta <code>frib1trecon/install.sh</code>.</td></tr>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <div class="card">
+      <section style="margin-bottom:0">
+        <h2>📋 Qué significa cada sección de resultados</h2>
+        <div class="table-wrap">
+          <table>
+            <tr><th>Sección</th><th>Significado</th></tr>
+            <tr><td>Nivel de riesgo</td><td>Puntuación 0-100% calculada sobre 7 categorías con peso fijo (leaks, DNS/email, TLS, CVEs/EOL, reputación, squatting, identidad). Si una categoría tiene algún hallazgo, suma su peso completo.</td></tr>
+            <tr><td>Resumen</td><td>Todos los autores, editores, software, emails, rutas internas y equipos/servidores únicos detectados, más contadores de cada categoría.</td></tr>
+            <tr><td>DNS y WHOIS / TLS y cabeceras</td><td>Postura de seguridad del dominio: autenticación de correo, DNSSEC, transferencia de zona, certificado TLS, cabeceras HTTP.</td></tr>
+            <tr><td>Documentos con metadatos</td><td>Un documento por fila: quién lo creó/editó, con qué programa, cuándo, y qué emails/rutas internas/equipos se filtraron dentro.</td></tr>
+            <tr><td>Ficheros sensibles</td><td>sql/log/env/bak encontrados en buscadores o en rutas habituales. Fila en rojo si se detectó algún patrón de credencial dentro.</td></tr>
+            <tr><td>Plataformas externas / posibles leaks OSINT</td><td>Menciones del dominio en Drive, Pastebin, GitHub, etc. Fila en rojo si es una categoría de "leak" confirmada en local.</td></tr>
+            <tr><td>Fuentes externas y Cloud</td><td>Shodan, buckets, reputación VirusTotal/AbuseIPDB, subdominios, infraestructura cloud detectada.</td></tr>
+            <tr><td>Organigrama aproximado (LinkedIn)</td><td>Personas agrupadas por nivel de seniority según palabras clave del puesto. <strong>No son relaciones de jefatura reales.</strong></td></tr>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <div class="card">
+      <section style="margin-bottom:0">
+        <h2>🚫 Si una búsqueda de repente da 0 resultados</h2>
+        <p>
+          SearXNG solo trae activados por defecto un par de motores reales
+          (Brave, DuckDuckGo). Si lanzas el mismo dominio muchas veces seguidas
+          en poco tiempo, esos motores pueden quedar "suspendidos" por
+          rate-limit durante un rato, y las búsquedas devuelven 0 resultados
+          aunque el dominio sí tenga contenido indexado. Para solucionarlo:
+        </p>
+        <pre>cd frib1trecon && sudo docker compose restart searxng</pre>
+        <p>
+          Eso limpia el estado de suspensión (vive solo en memoria del
+          contenedor). frib1trecon ya impone un mínimo de 1.5s entre peticiones
+          para que esto no pase por accidente, pero sigue pasando si escaneas
+          el mismo dominio muy seguido.
+        </p>
+      </section>
+    </div>
+
+    <div class="card">
+      <section style="margin-bottom:0">
+        <h2>⚖️ Uso responsable</h2>
+        <p>
+          Es reconocimiento pasivo: solo consulta contenido ya indexado
+          públicamente o hace comprobaciones estándar (DNS, TLS) que haría
+          cualquier navegador; no ataca al servidor del dominio objetivo. Aun
+          así, úsalo solo contra dominios propios o con autorización, y no
+          bajes los delays ni lances muchos dominios seguidos sin necesidad.
+        </p>
+      </section>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    frib1trecon — reconocimiento OSINT pasivo
+  </footer>
+</body>
+</html>

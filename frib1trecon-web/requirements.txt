@@ -1,0 +1,2 @@
+Flask>=3.0
+-r ../frib1trecon/requirements.txt

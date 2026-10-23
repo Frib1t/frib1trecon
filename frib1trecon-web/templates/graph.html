@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>frib1trecon — grafo de red {{ job.domain }}</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="https://unpkg.com/vis-network@9/standalone/umd/vis-network.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <style>
+    #graph-container {
+      position: relative;
+      width: 100%;
+      height: 72vh;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--panel);
+      overflow: hidden;
+    }
+    #graph { width: 100%; height: 100%; }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem 1.2rem;
+      margin: 0 0 1rem;
+      font-size: 0.85rem;
+    }
+    .legend-item { display: flex; align-items: center; gap: 0.4rem; }
+    .legend-item label { display: flex; align-items: center; gap: 0.4rem; cursor: pointer; margin: 0; color: var(--text); }
+    .legend-item a { color: var(--accent); text-decoration: none; font-size: 0.85rem; }
+    .legend-item a:hover { text-decoration: underline; }
+    .legend-dot {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+    .legend-icon {
+      width: 1.1rem;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    #graph-toolbar {
+      display: flex;
+      gap: 0.8rem;
+      align-items: center;
+      margin-bottom: 0.9rem;
+      flex-wrap: wrap;
+    }
+    #graph-toolbar label { display: flex; align-items: center; gap: 0.4rem; color: var(--muted); margin: 0; cursor: pointer; }
+    #graph-toolbar input[type="text"] {
+      min-width: 240px;
+      width: auto;
+    }
+    #node-info {
+      margin-top: 0.9rem;
+      padding: 0.8rem 1rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--panel);
+      font-size: 0.88rem;
+      min-height: 1.2rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: var(--mono);
+    }
+    #loading { color: var(--muted); padding: 1rem; display: flex; align-items: center; gap: 0.6rem; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="{{ url_for('index') }}">
+        <img class="brand-mark" src="{{ url_for('static', filename='favicon.svg') }}" alt="">
+        <span class="brand-name">frib1t<span>recon</span></span>
+      </a>
+      <nav class="topnav">
+        <a href="{{ url_for('job_page', job_id=job.id) }}">&larr; Volver al informe</a>
+        <a href="{{ url_for('help_page') }}">❓ Ayuda</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="hero">
+      <span class="eyebrow">🕸️ Grafo interactivo</span>
+      <h1>{{ job.domain }}</h1>
+      <p class="hint">
+        Arrastra los nodos para reordenar, rueda del ratón para zoom, clic en un nodo para ver su detalle.
+        Incluye todo lo recopilado: dominio/subdominios, IPs y hostnames (Shodan), infraestructura cloud,
+        software con vulnerabilidades conocidas, leaks, menciones en plataformas, emails y personas (LinkedIn).
+      </p>
+    </div>
+
+    <div id="graph-toolbar">
+      <input type="text" id="search-box" placeholder="🔍 Buscar nodo (email, subdominio, IP...)">
+      <label><input type="checkbox" id="physics-toggle" checked> Simulación física (desactivar si hay muchos nodos y va lento)</label>
+    </div>
+
+    <div class="legend" id="legend-filters">
+      <span class="legend-item"><label><input type="checkbox" class="group-toggle" data-group="domain" checked><i class="fa-solid fa-globe legend-icon" style="color:#4F8CFF"></i>Dominio</label></span>
+      <span class="legend-item"><label><input type="checkbox" class="group-toggle" data-group="subdomain" checked><i class="fa-solid fa-sitemap legend-icon" style="color:#7C5CFF"></i>Subdominio</label></span>
+      <span class="legend-item"><label><input type="checkbox" class="group-toggle" data-group="ip" checked><i class="fa-solid fa-server legend-icon" style="color:#22D3EE"></i>IP (Shodan)</label></span>
+      <span class="legend-item"><label><input type="checkbox" class="group-toggle" data-group="cloud" checked><i class="fa-solid fa-cloud legend-icon" style="color:#2DD4BF"></i>Cloud</label></span>
+      <span class="legend-item"><label><input type="checkbox" class="group-toggle" data-group="vuln" checked><i class="fa-solid fa-bug legend-icon" style="color:#FB923C"></i>Software vulnerable</label></span>
+      <span class="legend-item"><label><input type="checkbox" class="group-toggle" data-group="leak" checked><i class="fa-solid fa-skull legend-icon" style="color:#F43F5E"></i>Leak</label></span>
+      <span class="legend-item"><label><input type="checkbox" class="group-toggle" data-group="platform" checked><i class="fa-solid fa-share-nodes legend-icon" style="color:#F472B6"></i>Plataforma</label></span>
+      <span class="legend-item"><label><input type="checkbox" class="group-toggle" data-group="email" checked><i class="fa-solid fa-user legend-icon" style="color:#FACC15"></i>Email</label></span>
+      <span class="legend-item"><label><input type="checkbox" class="group-toggle" data-group="person" checked><i class="fa-solid fa-user-tie legend-icon" style="color:#A78BFA"></i>Persona (LinkedIn)</label></span>
+      <span class="legend-item"><label><input type="checkbox" class="group-toggle" data-group="document" checked><i class="fa-solid fa-envelope legend-icon" style="color:#4ADE80"></i>Documento</label></span>
+      <span class="legend-item"><label><input type="checkbox" class="group-toggle" data-group="sensitive" checked><i class="fa-solid fa-lock legend-icon" style="color:#FBBF24"></i>Fichero sensible</label></span>
+      <span class="legend-item"><label><input type="checkbox" class="group-toggle" data-group="tech" checked><i class="fa-solid fa-microchip legend-icon" style="color:#38BDF8"></i>Tecnologia web</label></span>
+      <span class="legend-item"><a href="#" id="toggle-all-on">Marcar todas</a> · <a href="#" id="toggle-all-off">Desmarcar todas</a></span>
+    </div>
+
+    <div id="graph-container">
+      <div id="loading"><span class="spinner"></span> Cargando grafo...</div>
+      <div id="graph"></div>
+    </div>
+    <div id="node-info">Clic en un nodo para ver su detalle aquí.</div>
+
+    <p class="hint" style="margin-top:1rem">
+      <a href="{{ url_for('download', job_id=job.id, fmt='red-json') }}">⬇ descargar red.json (datos en bruto del grafo)</a>
+    </p>
+  </main>
+
+  <footer class="site-footer">
+    frib1trecon — reconocimiento OSINT pasivo
+  </footer>
+
+  <script>
+    // Iconos de Font Awesome (glifo + color) por tipo de nodo, al estilo
+    // VirusTotal Graph pero con un icono reconocible por categoria en vez
+    // de un circulo liso: mas facil de identificar de un vistazo que el
+    // color solo. "code" son los codepoints reales de Font Awesome 6 Free
+    // Solid (comprobados contra el css oficial, no de memoria).
+    const GROUP_ICONS = {
+      domain:    { code: "", color: "#4F8CFF", size: 46 },  // globe
+      subdomain: { code: "", color: "#7C5CFF", size: 28 },  // sitemap
+      ip:        { code: "", color: "#22D3EE", size: 28 },  // server
+      cloud:     { code: "", color: "#2DD4BF", size: 28 },  // cloud
+      vuln:      { code: "", color: "#FB923C", size: 32 },  // bug
+      leak:      { code: "", color: "#F43F5E", size: 34 },  // skull
+      platform:  { code: "", color: "#F472B6", size: 26 },  // share-nodes
+      email:     { code: "", color: "#FACC15", size: 26 },  // user
+      person:    { code: "", color: "#A78BFA", size: 26 },  // user-tie
+      document:  { code: "", color: "#4ADE80", size: 26 },  // envelope
+      sensitive: { code: "", color: "#FBBF24", size: 28 },  // lock
+      tech:      { code: "", color: "#38BDF8", size: 26 },  // microchip
+    };
+
+    let network = null;
+    let allNodesDataSet = null;
+
+    async function loadGraph() {
+      const res = await fetch("{{ url_for('job_graph_data', job_id=job.id) }}");
+      const data = await res.json();
+      document.getElementById("loading").style.display = "none";
+
+      // OJO: no se usa la propiedad reservada "group" de vis-network (su
+      // sistema de auto-coloreado por grupo pisaba nuestra paleta propia
+      // en cuanto se actualizaba el DataSet, p.ej. al ocultar/mostrar
+      // nodos) - se guarda en "myGroup" para el filtrado propio.
+      const visNodes = data.nodes.map(n => {
+        const info = GROUP_ICONS[n.group] || GROUP_ICONS.subdomain;
+        return {
+          id: n.id,
+          label: n.label.length > 22 ? n.label.slice(0, 20) + "…" : n.label,
+          title: n.title,
+          myGroup: n.group,
+          shape: "icon",
+          icon: { face: "'Font Awesome 6 Free'", weight: "900", code: info.code, size: info.size, color: info.color },
+          font: { color: "#e8ebf1", size: 12, face: "monospace", strokeWidth: 3, strokeColor: "#0b0f17", vadjust: info.size / 2 + 8 },
+        };
+      });
+      const visEdges = data.edges.map((e, i) => ({
+        id: i,
+        from: e.from,
+        to: e.to,
+        label: e.label || "",
+        dashes: !!e.dashed,
+        arrows: { to: { enabled: true, scaleFactor: 0.4 } },
+        font: { size: 8, color: "#5f6b85", strokeWidth: 0, align: "middle" },
+        color: { color: "#2a3450", opacity: 0.55, highlight: "#4f8cff" },
+        width: 0.8,
+        smooth: { type: "continuous", roundness: 0.3 },
+      }));
+
+      allNodesDataSet = new vis.DataSet(visNodes);
+      const edgesDataSet = new vis.DataSet(visEdges);
+
+      const container = document.getElementById("graph");
+      const graphData = { nodes: allNodesDataSet, edges: edgesDataSet };
+      // Layout al estilo VirusTotal Graph: nodos circulares uniformes
+      // (el color es lo unico que distingue el tipo), forceAtlas2Based
+      // para que los clusters se separen de forma radial alrededor del
+      // dominio en vez de amontonarse, sobre el fondo oscuro ya existente.
+      const options = {
+        physics: {
+          solver: "forceAtlas2Based",
+          stabilization: { iterations: 200 },
+          forceAtlas2Based: { gravitationalConstant: -60, springLength: 140, springConstant: 0.06, damping: 0.4, avoidOverlap: 0.6 },
+        },
+        interaction: { hover: true, tooltipDelay: 150 },
+        nodes: { shadow: { enabled: true, color: "rgba(0,0,0,0.4)", size: 8, x: 0, y: 2 } },
+        edges: { shadow: false },
+      };
+      network = new vis.Network(container, graphData, options);
+
+      network.on("click", (params) => {
+        const info = document.getElementById("node-info");
+        if (params.nodes.length === 0) {
+          info.textContent = "Clic en un nodo para ver su detalle aqui.";
+          return;
+        }
+        const node = data.nodes.find(n => n.id === params.nodes[0]);
+        info.textContent = node ? `[${node.group}] ${node.title || node.label}` : "";
+      });
+    }
+
+    document.getElementById("physics-toggle").addEventListener("change", (e) => {
+      if (network) network.setOptions({ physics: { enabled: e.target.checked } });
+    });
+
+    document.getElementById("search-box").addEventListener("input", (e) => {
+      if (!network || !allNodesDataSet) return;
+      const q = e.target.value.trim().toLowerCase();
+      if (!q) return;
+      const match = allNodesDataSet.get().find(n => n.label.toLowerCase().includes(q));
+      if (match) {
+        network.selectNodes([match.id]);
+        network.focus(match.id, { scale: 1.2, animation: true });
+      }
+    });
+
+    function setGroupVisible(group, visible) {
+      if (!allNodesDataSet) return;
+      const updates = allNodesDataSet.get({ filter: n => n.myGroup === group })
+        .map(n => ({ id: n.id, hidden: !visible }));
+      if (updates.length) allNodesDataSet.update(updates);
+    }
+
+    document.querySelectorAll(".group-toggle").forEach((cb) => {
+      cb.addEventListener("change", () => setGroupVisible(cb.dataset.group, cb.checked));
+    });
+
+    document.getElementById("toggle-all-on").addEventListener("click", (e) => {
+      e.preventDefault();
+      document.querySelectorAll(".group-toggle").forEach((cb) => {
+        cb.checked = true;
+        setGroupVisible(cb.dataset.group, true);
+      });
+    });
+
+    document.getElementById("toggle-all-off").addEventListener("click", (e) => {
+      e.preventDefault();
+      document.querySelectorAll(".group-toggle").forEach((cb) => {
+        cb.checked = false;
+        setGroupVisible(cb.dataset.group, false);
+      });
+    });
+
+    loadGraph();
+  </script>
+</body>
+</html>

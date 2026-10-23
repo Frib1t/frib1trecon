@@ -1,0 +1,20 @@
+services:
+  searxng:
+    image: searxng/searxng:latest
+    container_name: frib1trecon-searxng
+    # corre como el mismo UID:GID del usuario anfitrion (lo exporta
+    # setup_searxng.py antes de "docker compose up") para que settings.yml
+    # se cree ya con los permisos correctos y nunca haga falta un "sudo
+    # chown" despues: sin esto, el proceso interno de SearXNG crea el
+    # fichero con SU uid (variable segun la imagen), que casi nunca
+    # coincide con el del usuario que lo ejecuta.
+    user: "${FRIB1TRECON_UID:-1000}:${FRIB1TRECON_GID:-1000}"
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./searxng:/etc/searxng:rw
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:8080/
+      - UWSGI_WORKERS=2
+      - UWSGI_THREADS=4
+    restart: unless-stopped

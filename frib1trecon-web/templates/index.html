@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>frib1trecon — reconocimiento OSINT</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="{{ url_for('index') }}">
+        <img class="brand-mark" src="{{ url_for('static', filename='favicon.svg') }}" alt="">
+        <span class="brand-name">frib1t<span>recon</span></span>
+      </a>
+      <nav class="topnav">
+        <a href="{{ url_for('help_page') }}">❓ Ayuda</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="hero">
+      <span class="eyebrow">🛰 Reconocimiento OSINT pasivo</span>
+      <h1>Analiza un dominio</h1>
+      <p>
+        Dorking + metadatos + DNS/TLS + leaks públicos + reputación + typosquatting,
+        todo pasivo (sin atacar al servidor objetivo) y a través de tu propia instancia
+        de SearXNG, para no arriesgarte a bloqueos de IP.
+      </p>
+    </div>
+
+    <form method="post" action="{{ url_for('scan') }}" enctype="multipart/form-data">
+      <div class="card">
+        <div class="card-head"><h2><span class="icon">🎯</span> Dominio objetivo</h2></div>
+        <div class="field">
+          <input type="text" class="domain-input" name="domain" placeholder="ejemplo.com" required
+                 pattern="^(?!https?://)(?!www\.)[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+                 title="Escribe solo el dominio, sin http:// ni www.">
+        </div>
+        <div class="option-list">
+          <label class="toggle">
+            <input type="checkbox" name="save_docs" checked>
+            <span class="toggle-track"></span>
+            <span class="toggle-body">
+              <span class="toggle-title">📄 Guardar documentos descargados</span>
+              <span class="toggle-desc">Se quedan en disco tras extraer los metadatos. Si lo desactivas, se descartan al momento.</span>
+            </span>
+          </label>
+          <label class="toggle">
+            <input type="checkbox" name="no_download">
+            <span class="toggle-track"></span>
+            <span class="toggle-body">
+              <span class="toggle-title">⚡ Solo listar URLs</span>
+              <span class="toggle-desc">Modo rápido: no descarga ni analiza ningún fichero, solo dice qué encontró.</span>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2><span class="icon">🧩</span> Categorías</h2></div>
+        <p class="card-desc">Por defecto se lanzan TODAS las categorías (documentos, sensibles, plataformas, leaks, emails, DNS, TLS + estas de abajo), para el informe más completo posible. Destildá la que no quieras correr.</p>
+        <div class="option-list">
+          <label class="toggle">
+            <input type="checkbox" name="linkedin" checked>
+            <span class="toggle-track"></span>
+            <span class="toggle-body">
+              <span class="toggle-title">👥 Empleados en LinkedIn</span>
+              <span class="toggle-desc">Organigrama aproximado por seniority (palabras clave del puesto, no son relaciones de jefatura reales).</span>
+            </span>
+          </label>
+          <label class="toggle">
+            <input type="checkbox" name="vuln" checked>
+            <span class="toggle-track"></span>
+            <span class="toggle-body">
+              <span class="toggle-title">🐞 Tecnologías web y CVEs <span class="toggle-slow">algo lento</span></span>
+              <span class="toggle-desc">Fingerprinting (CMS/framework/servidor), plugins y temas, comprobaciones de WordPress, Drupal, Joomla y Liferay, CVEs y PoC (NVD/ExploitDB/Sploitus) y software sin soporte (EOL).</span>
+            </span>
+          </label>
+          <label class="toggle">
+            <input type="checkbox" name="ports" checked>
+            <span class="toggle-track"></span>
+            <span class="toggle-body">
+              <span class="toggle-title">🔌 Puertos abiertos y versiones de servicios <span class="toggle-slow">activo</span></span>
+              <span class="toggle-desc">Escaneo nmap DIRECTO contra el objetivo (no pasivo). Identifica puertos y servicios con su versión, y busca CVEs y PoCs conocidos para cada una. Destildá esto si el dominio no es propio o no tenés autorización para tráfico activo.</span>
+            </span>
+          </label>
+          <label class="toggle">
+            <input type="checkbox" name="typosquat" checked>
+            <span class="toggle-track"></span>
+            <span class="toggle-body">
+              <span class="toggle-title">🎭 Typosquatting / domain squatting <span class="toggle-slow">lento</span></span>
+              <span class="toggle-desc">Genera y resuelve 1000+ variantes del dominio para ver cuáles están registradas de verdad.</span>
+            </span>
+          </label>
+          <label class="toggle">
+            <input type="checkbox" id="external_osint" name="external_osint" checked>
+            <span class="toggle-track"></span>
+            <span class="toggle-body">
+              <span class="toggle-title">🌐 Fuentes externas y cloud</span>
+              <span class="toggle-desc">Subdominios (crt.sh, Certspotter, fuerza bruta DNS), takeover por CNAME, Shodan, Wayback con URLs vivas y parámetros sensibles, buckets públicos S3/GCS/Azure y reputación de cada IP con VirusTotal/AbuseIPDB (api key opcional).</span>
+            </span>
+          </label>
+          <div class="sub-options" id="external-sub">
+            <label class="toggle">
+              <input type="checkbox" id="recursive" name="recursive">
+              <span class="toggle-track"></span>
+              <span class="toggle-body">
+                <span class="toggle-title">🔁 Seguir subdominios descubiertos</span>
+                <span class="toggle-desc">Escanea también cada subdominio (1 nivel) y los junta con el dominio principal en un único informe consolidado.</span>
+              </span>
+            </label>
+            <div class="field" id="max-subdomains-field" style="display:none; margin-top:0.6rem;">
+              <label class="field-label">Máximo de subdominios a seguir</label>
+              <input type="number" name="max_subdomains" value="10" min="1" max="50">
+            </div>
+            <div class="field" id="recursive-categories-field" style="display:none; margin-top:0.6rem;">
+              <label class="field-label">Categorías a usar en cada subdominio</label>
+              <input type="text" name="recursive_categories" placeholder="por defecto: document,sensitive,leak">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="external-keys" style="display:block">
+        <div class="card-head"><h2><span class="icon">🔑</span> API keys de fuentes externas</h2></div>
+        <p class="card-desc">Todas opcionales — sin ellas, esas fuentes concretas simplemente no aportan nada. Nunca se guardan en el servidor más allá de este escaneo.</p>
+        <div class="grid-2">
+          <div class="field">
+            <label class="field-label">Shodan</label>
+            <input type="text" name="shodan_key" placeholder="vacío = solo InternetDB (gratis)">
+          </div>
+          <div class="field">
+            <label class="field-label">GrayHatWarfare</label>
+            <input type="text" name="ghw_key" placeholder="necesaria para buckets expuestos indexados">
+          </div>
+          <div class="field">
+            <label class="field-label">IntelX</label>
+            <input type="text" name="intelx_key" placeholder="necesaria para leaks/darkweb">
+          </div>
+          <div class="field">
+            <label class="field-label">DNSDumpster</label>
+            <input type="text" name="dnsdumpster_key" placeholder="necesaria para esta fuente de subdominios">
+          </div>
+          <div class="field">
+            <label class="field-label">VirusTotal</label>
+            <input type="text" name="vt_key" placeholder="reputación del dominio/IP, hay tier gratuito">
+          </div>
+          <div class="field">
+            <label class="field-label">AbuseIPDB</label>
+            <input type="text" name="abuseipdb_key" placeholder="reputación de abuso de la IP, hay tier gratuito">
+          </div>
+          <div class="field">
+            <label class="field-label">Censys (API ID)</label>
+            <input type="text" name="censys_id" placeholder="hosts y puertos por dominio">
+          </div>
+          <div class="field">
+            <label class="field-label">Censys (API secret)</label>
+            <input type="password" name="censys_secret" placeholder="secret de Censys">
+          </div>
+          <div class="field">
+            <label class="field-label">FOFA (email)</label>
+            <input type="text" name="fofa_email" placeholder="email de la cuenta FOFA">
+          </div>
+          <div class="field">
+            <label class="field-label">FOFA (API key)</label>
+            <input type="password" name="fofa_key" placeholder="hosts y puertos por dominio">
+          </div>
+          <div class="field">
+            <label class="field-label">HaveIBeenPwned</label>
+            <input type="password" name="hibp_key" placeholder="busca los correos encontrados en brechas">
+          </div>
+          <div class="field">
+            <label class="field-label">DomScan</label>
+            <input type="password" name="domscan_key" placeholder="selectores DKIM del dominio">
+          </div>
+          <div class="field">
+            <label class="field-label">OTX AlienVault</label>
+            <input type="password" name="otx_key" placeholder="DNS pasivo (subdominios e IPs históricos), gratis con registro">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2><span class="icon">🖼️</span> Logos del informe (opcional)</h2></div>
+        <p class="toggle-desc" style="margin-top:-0.4rem;">Personalizan la portada y las cabeceras de
+          <code>cyber_health_check.docx</code>/<code>.tex</code>/<code>.pdf</code>. Los tres son
+          independientes: el que no subas simplemente no aparece. Formatos: PNG/JPG.</p>
+        <div class="grid-3" style="margin-top:0.6rem;">
+          <div class="field">
+            <label class="field-label">Portada</label>
+            <input type="file" name="portada_logo" accept="image/png,image/jpeg">
+          </div>
+          <div class="field">
+            <label class="field-label">Logo del cliente (esquina derecha)</label>
+            <input type="file" name="cliente_logo" accept="image/png,image/jpeg">
+          </div>
+          <div class="field">
+            <label class="field-label">Logo propio / pentester (esquina izquierda)</label>
+            <input type="file" name="pentester_logo" accept="image/png,image/jpeg">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="collapsible-trigger" id="advanced-trigger">
+          <span class="chevron">▶</span>
+          <span><span class="icon">⚙️</span> Opciones avanzadas (delays, instancia SearXNG, proxies)</span>
+        </div>
+        <div class="collapsible-body" id="advanced-body">
+          <div class="grid-3" style="margin-top:0.8rem;">
+            <div class="field">
+              <label class="field-label">Delay mínimo (s)</label>
+              <input type="number" step="0.5" name="min_delay" value="2.5">
+            </div>
+            <div class="field">
+              <label class="field-label">Delay máximo (s)</label>
+              <input type="number" step="0.5" name="max_delay" value="6">
+            </div>
+            <div class="field">
+              <label class="field-label">Instancia SearXNG</label>
+              <input type="text" name="searxng" value="http://127.0.0.1:8080">
+            </div>
+            <div class="field">
+              <label class="field-label">Proxies HTTP(S) a rotar</label>
+              <input type="text" name="proxy" placeholder="http://127.0.0.1:9050, http://otro:8080">
+            </div>
+          </div>
+          <label class="toggle" style="margin-top:0.8rem;">
+            <input type="checkbox" id="no_latex_pdf" name="no_latex_pdf">
+            <span class="toggle-track"></span>
+            <span class="toggle-body">
+              <span class="toggle-title">🚫 No compilar el PDF del informe LaTeX</span>
+              <span class="toggle-desc">El <code>cyber_health_check.tex</code> se genera siempre; esto solo evita compilarlo a <code>.pdf</code> con pdflatex (si no lo tienes instalado, esto no hace falta).</span>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-lg">🔍 Analizar dominio</button>
+    </form>
+
+    <p class="hint" style="margin-top:1.4rem">
+      Requiere que SearXNG esté arriba (desde <code>frib1trecon/</code>: <code>./install.sh</code> o
+      <code>python3 setup_searxng.py</code>). El escaneo puede tardar varios minutos: se procesan
+      los documentos uno a uno a propósito, con pausas aleatorias, para no levantar bloqueos en
+      los motores de búsqueda.
+    </p>
+  </main>
+
+  <footer class="site-footer">
+    frib1trecon — reconocimiento OSINT pasivo · <a href="{{ url_for('help_page') }}">Ayuda</a>
+  </footer>
+
+  <script>
+    const extCheckbox = document.getElementById('external_osint');
+    const extKeys = document.getElementById('external-keys');
+    extCheckbox.addEventListener('change', () => {
+      extKeys.style.display = extCheckbox.checked ? 'block' : 'none';
+    });
+    const recCheckbox = document.getElementById('recursive');
+    const maxSubField = document.getElementById('max-subdomains-field');
+    const recCatsField = document.getElementById('recursive-categories-field');
+    recCheckbox.addEventListener('change', () => {
+      maxSubField.style.display = recCheckbox.checked ? 'block' : 'none';
+      recCatsField.style.display = recCheckbox.checked ? 'block' : 'none';
+    });
+    const advTrigger = document.getElementById('advanced-trigger');
+    const advBody = document.getElementById('advanced-body');
+    advTrigger.addEventListener('click', () => {
+      advTrigger.classList.toggle('open');
+      advBody.classList.toggle('visible');
+    });
+  </script>
+</body>
+</html>

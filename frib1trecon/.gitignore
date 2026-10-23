@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+
+# config generado localmente por el contenedor (contiene un secret_key propio de
+# cada instalacion; docker/setup_searxng.py la vuelve a crear sola en cada maquina)
+searxng/
+
+# resultados de escaneos reales: nunca deben subirse (pueden contener documentos,
+# emails y credenciales de dominios de terceros)
+frib1trecon_output/
